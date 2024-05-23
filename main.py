@@ -8,10 +8,17 @@ import pathlib
 import datetime
 import platform
 import http.client
+from types import SimpleNamespace
+
+import WCConfig
+
+CONFIG_JSON_PATH = "config.json"
+
+config: WCConfig.WCConfig
 
 
-def download_file(address, path, filename): #host, port, path, filename
-    conn = http.client.HTTPConnection(address["host"], address["port"]) #(host, port)
+def download_file(host, port, path, filename): #host, port, path, filename
+    conn = http.client.HTTPConnection(host, port) #(host, port)
     conn.request('GET', path)
     response = conn.getresponse()
     
@@ -24,10 +31,10 @@ def download_file(address, path, filename): #host, port, path, filename
     
     conn.close()
 
-def start_client(address, httpAddress): #(host, port)
+def start_client(host: str, port: int):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(address) #((host, port))
-    print(f'Verbunden mit dem Server an ' + address)
+    client_socket.connect((host, port))
+    print(f'Verbunden mit dem Server an ' + host + ":" + str(port))
     
     # Daten vom Server empfangen
     received_data = client_socket.recv(256) # mehr als genug
@@ -40,9 +47,11 @@ def start_client(address, httpAddress): #(host, port)
     client_socket.close()
 
     time.sleep(1)
-    download_file(httpAddress, data["file"], "testfile.blend")
+    download_file(host, port, data["file"], "testfile.blend")
 
 def register():
+    #Register at server as available worker
+    #Start thread to listen to tasks
     return
 
 def loop():
@@ -95,42 +104,10 @@ def getArgValue(message: str, args: list[str], index: int):
     
     return args[index]
 
-def main():
-    start_client("localhost:65432", {"host": "localhost", "port": 65432})
-    return
-    # make these variables global / wrap into singleton object / use config dictionary ???
-    blenderPath = ""
-    blenderArgs = ""
-    serverAddress = "" #TODO:set default value
-    httpHost = "" #TODO:set default value
-    httpPort = -1 #TODO:set default value
-    autoRegister = False
-    dumpConfig = False
+def parseArgs(args: list[str]):
+    global config
+    dumpConfig: bool = False
 
-    #TODO:outsource to function
-    if not (os.path.exists("config.json")):
-        print("No config file found")
-    else:
-        with open("config.json") as file:
-            try:
-                config = json.load(file)
-                if "blenderPath" in config:
-                    blenderPath = config["blenderPath"]
-                    blenderPath = checkBlenderPath(blenderPath)
-                    if (blenderPath == ""):
-                        return
-                    
-                if "blenderArgs" in config:
-                    blenderArgs = config["blenderArgs"]
-
-            except Exception as ex:
-                cwd = pathlib.Path().resolve()
-                print("Failed to parse " +  os.path.join(cwd, "config.json"))
-                print("Exception: " + str(ex))
-
-
-    args = sys.argv
-    print(args)
     for i in range(1, len(args)):
         if (args[i].lower() == "-h" or "-help"):
             print("Available command line arguments:")
@@ -139,55 +116,50 @@ def main():
             dumpConfig = True
 
         elif (args[i].lower() == "-ar" or "-autoregister"):
-            autoRegister = True
+            config.autoRegister = True
 
         elif (args[i].lower() == "-s" or "-server"):
-            i += 1            
-            serverAddress = getArgValue("server address", args, i)
+            i += 1
+            config.serverAddress = getArgValue("server address", args, i)
             #TODO(maybe): check for address validity
 
         elif (args[i].lower() == "-httphost"):
             i += 1
-            httpHost = getArgValue("HTTP host", args, i)
+            config.httpHost = getArgValue("HTTP host", args, i)
 
         elif (args[i].lower() == "-httpport"):
             i += 1
             port = getArgValue("HTTP port", args, i)
             try:
-                httpPort = int(host)
+                config.httpPort = int(port)
 
             except:
                 print("Failed to parse HTTP port to integer: " + port)
-                returns
+                exit()
 
         elif (args[i].lower() == "-b" or "-blender" or "-blenderpath"):
             i += 1
-            blenderPath = getArgValue("blender path", args, i)
-            blenderPath = checkBlenderPath(blenderPath)
-    
-    #TODO:outsource to function
+            config.blenderPath = getArgValue("blender path", args, i)
+            config.blenderPath = checkBlenderPath(config.blenderPath)
+
     if (dumpConfig):
-        config = {
-            "blenderPath": blenderPath,
-            "blenderArgs": blenderArgs,
-            "serverAddress": serverAddress,
-            "autoRegister": autoRegister,
-            "httpHost": httpHost,
-            "httpPort": httpPort
-        }
+        config.saveToJson(CONFIG_JSON_PATH)
 
-        try:
-            with open("config.json", "w") as file:
-                json.dump(config, file)
 
-        except Exception as ex:
-            print("Failed to write to config.json")
-            print("Exception: " + ex)
+def main():
+    start_client("localhost", 65432)
+    return
 
-    
+    global config
+
+    config = WCConfig.WCConfig()
+    config.readFromJson(CONFIG_JSON_PATH)
+
+    parseArgs(sys.argv)
+
     if (autoRegister):
         register()
-    else:
-        loop()
+
+    loop()
 
 main()
