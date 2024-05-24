@@ -6,22 +6,24 @@ from typing import Dict
 
 
 class WCConfig:
-    blenderPath: str = ""
-    blenderArgs: str = ""
-    outputPath: str = "" #TODO:set default value
-    serverAddress: str = ""  # TODO:set default value
-    httpHost: str = ""  # TODO:set default value
-    httpPort: int = -1  # TODO:set default value
-    autoRegister: bool = False
+    blenderPath:    str  = ""
+    blenderArgs:    str  = ""
+    outputPath:     str  = "/out/" #TODO:set default value #HINT: // at start means relative to blend file
+    serverAddress:  str  = ""  # TODO:set default value
+    serverPort:     int  = 8000
+    httpHost:       str  = ""  # TODO:set default value
+    httpPort:       int  = -1  # TODO:set default value
+    autoRegister:   bool = False
 
-    def __init__(self, blenderPath: str, blenderArgs: str, outputPath: str, serverAddress: str, httpHost: str, httpPort: int, autoRegister: bool):
-        self.blenderPath = blenderPath
-        self.blenderArgs = blenderArgs
-        self.outputPath = outputPath
-        self.serverAddress = serverAddress
-        self.httpHost = httpHost
-        self.httpPort = httpPort
-        self.autoRegister = autoRegister
+    def __init__(self, blenderPath: str, blenderArgs: str, outputPath: str, serverAddress: str, serverPort: int, httpHost: str, httpPort: int, autoRegister: bool):
+        self.blenderPath    = blenderPath
+        self.blenderArgs    = blenderArgs
+        self.outputPath     = outputPath
+        self.serverAddress  = serverAddress
+        self.serverPort     = serverPort
+        self.httpHost       = httpHost
+        self.httpPort       = httpPort
+        self.autoRegister   = autoRegister
 
     def __init__(self): return
 

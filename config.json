@@ -1,1 +1,7 @@
-{"blenderPath": "testpath"}
+{
+    "blenderPath": "/Applications/Blender.app/Contents/MacOs/Blender",
+    "httpHost": "localhost",
+    "httpPort": 65432,
+    "serverAddress": "localhost",
+    "serverPort": 65431
+}

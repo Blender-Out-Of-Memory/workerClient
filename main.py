@@ -1,35 +1,95 @@
 import os
 import sys
 import time
-import json
 import socket
 import pickle
-import pathlib
-import datetime
 import platform
+import subprocess
 import http.client
-from types import SimpleNamespace
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+from threading import Thread
 
 import WCConfig
+import CommunicationConstants as CConsts
 
 CONFIG_JSON_PATH = "config.json"
 
 config: WCConfig.WCConfig
+isRegistered: bool = False
+
+workingThread: Thread = None
+listenerThread: Thread = None
+
+class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        print("Got request for " + self.path)
+        if self.path == CConsts.STARTTASK:
+            global workingThread
+            if (workingThread is not None and workingThread.isAlive()):
+                print(f"Worker thread already running. Ignoring \"{CConsts.STARTTASK}\" request") #TODO:(maybe) implement queueing
+                self.send_error(500, f"Worker already working. Ignored request")
+                return
+
+            headers = self.headers
+            #try:
+            #    headers = self.headers
+            #except Exception as ex:
+            #    print(f"Failed to decode \"{CConsts.STARTTASK}\" request body (to dict)")
+            #    print("Exception: " + str(ex))
+            #    self.send_error(500, f"Failed to decode \"{CConsts.STARTTASK}\" request body (to dict)")
+            #    return
+
+            if (("task-id" and "file" and "start_frame" and "end_frame") in headers):
+                workingThread = Thread(target=runTask, args=(headers["task-id"], headers["file"], headers["start_frame"], headers["end_frame"]))
+                workingThread.start()
+                print("Started working thread")
+                self.send_response(200)
+                self.end_headers() # necessary to send
+                return
+            else:
+                print("Missing information in request body")
+                self.send_error(500, f"Missing information in request body")
+                return
+
+        else:
+            print("Unknown request (path)")
 
 
-def download_file(host, port, path, filename): #host, port, path, filename
-    conn = http.client.HTTPConnection(host, port) #(host, port)
+def download_file(task_id: str, path: str) -> str:
+    conn = http.client.HTTPConnection(config.serverAddress, config.serverPort)
     conn.request('GET', path)
     response = conn.getresponse()
-    
+
+    filename = task_id + ".blend"
     if response.status == 200:
-        with open(filename + " received at " + str(datetime.datetime.now()).replace(":", "---"), 'wb') as file:
+        with open(filename, 'wb') as file:
             file.write(response.read())
-        print('Datei erfolgreich heruntergeladen.')
+        print('Downloaded file successfully.')
+        return filename
     else:
-        print(f'Fehler beim Herunterladen der Datei: {response.status} {response.reason}')
-    
+        print(f'Error downloading file: {response.status} {response.reason}')
+        filename = ""
+
     conn.close()
+    return filename
+
+def runBlender(file: str, start_frame: int, end_frame: int):
+    command = config.blenderPath
+    command += config.blenderArgs
+    command += " -o " + config.outputPath
+    command += " -s " + str(start_frame)
+    command += " -e " + str(end_frame)
+    command += " " + file
+
+    subprocess.call(command, shell=True)
+
+def runTask(task_id: str, file: str, start_frame: int, end_frame: int):
+    filename = download_file(task_id, file)
+    if (filename == ""):
+        print("Ending thread as no file was downloaded")
+        return
+
+    runBlender(filename, start_frame, end_frame)
 
 def start_client(host: str, port: int):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,17 +109,55 @@ def start_client(host: str, port: int):
     time.sleep(1)
     download_file(host, port, data["file"], "testfile.blend")
 
+def listen(host: str, port: int):
+    server_address = (host, port)
+    httpd = HTTPServer(server_address, WorkerHTTPRequestHandler)
+    print(f'Listener runs at {host}:{port}')
+    httpd.serve_forever()
+    return
+
 def register():
     #Register at server as available worker
+    connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
+    data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
+    connection.request('GET', CConsts.WORKERMGMT, headers=data) #TODO:send WorkerID if already assigned one
+    response = connection.getresponse()
+
+    #Check if response belongs to request??
+    if response.status == 200:
+        responseData = response.read()
+        print("Registration sucessful: " + responseData.decode("utf-8"))
+        global isRegistered
+        isRegistered = True
+    else:
+        print(f'Registration failed: {response.status} {response.reason}')
+
+    connection.close()
     #Start thread to listen to tasks
+    listenerThread = Thread(target=listen, args=(config.httpHost, config.httpPort))
+    listenerThread.start()
     return
 
 def loop():
+    print("Entered loop")
     stop = False
     while not stop:
         inp = input("> ")
-        if (inp.lower() == "register"):
-            register()
+        if (inp.lower() == ("r" or "register")):
+            if (isRegistered):
+                print("Already registered")
+            else:
+                register()
+        elif (inp.lower() == ("q" or "quit")):
+            stop = True
+        elif (inp.lower() == ("fq" or "forcequit")):
+            #send forcequitted to server
+            exit()
+        elif (inp.lower() == ("sc" or "showconfig")):
+            global config
+            print(config.__dict__)
+        else:
+            print("Unknown command")
 
 def checkBlenderPath(blenderPath: str):
     if os.name == "nt":
@@ -109,19 +207,28 @@ def parseArgs(args: list[str]):
     dumpConfig: bool = False
 
     for i in range(1, len(args)):
-        if (args[i].lower() == "-h" or "-help"):
+        if (args[i].lower() == ("-h" or "-help")):
             print("Available command line arguments:")
 
-        elif (args[i].lower() == "-d" or "-dump" or "-dc" or "-dumpconfig"):
+        elif (args[i].lower() == ("-d" or "-dump" or "-dc" or "-dumpconfig")):
             dumpConfig = True
 
-        elif (args[i].lower() == "-ar" or "-autoregister"):
+        elif (args[i].lower() == ("-ar" or "-autoregister")):
             config.autoRegister = True
 
-        elif (args[i].lower() == "-s" or "-server"):
+        elif (args[i].lower() == ("-s" or "-server")):
             i += 1
             config.serverAddress = getArgValue("server address", args, i)
             #TODO(maybe): check for address validity
+
+        elif (args[i].lower() == ("-p" or "-port")):
+            i += 1
+            port = getArgValue("server port", args, i)
+            try:
+                config.serverPort = int(port)
+            except:
+                print("Failed to parse server port to integer: " + port)
+                exit()
 
         elif (args[i].lower() == "-httphost"):
             i += 1
@@ -132,23 +239,27 @@ def parseArgs(args: list[str]):
             port = getArgValue("HTTP port", args, i)
             try:
                 config.httpPort = int(port)
-
             except:
                 print("Failed to parse HTTP port to integer: " + port)
                 exit()
 
-        elif (args[i].lower() == "-b" or "-blender" or "-blenderpath"):
+        elif (args[i].lower() == ("-b" or "-blender" or "-blenderpath")):
             i += 1
             config.blenderPath = getArgValue("blender path", args, i)
             config.blenderPath = checkBlenderPath(config.blenderPath)
+
+        elif (args[i].lower() == ("-ba" or "-bargs" or "-blenderargs")):
+            i += 1
+            config.blenderArgs = getArgValue("blender args", args, i)
+            #Valiate blender args ??
 
     if (dumpConfig):
         config.saveToJson(CONFIG_JSON_PATH)
 
 
 def main():
-    start_client("localhost", 65432)
-    return
+    #start_client("localhost", 65432)
+    #return
 
     global config
 
@@ -157,9 +268,10 @@ def main():
 
     parseArgs(sys.argv)
 
-    if (autoRegister):
-        register()
+    if (config.autoRegister):
+        register(config.serverAddress, config.serverPort)
 
     loop()
+
 
 main()
