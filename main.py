@@ -1,8 +1,5 @@
 import os
 import sys
-import time
-import socket
-import pickle
 import platform
 import subprocess
 import http.client
@@ -31,13 +28,6 @@ class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
                 return
 
             headers = self.headers
-            #try:
-            #    headers = self.headers
-            #except Exception as ex:
-            #    print(f"Failed to decode \"{CConsts.STARTTASK}\" request body (to dict)")
-            #    print("Exception: " + str(ex))
-            #    self.send_error(500, f"Failed to decode \"{CConsts.STARTTASK}\" request body (to dict)")
-            #    return
 
             if (("task-id" and "file" and "start_frame" and "end_frame") in headers):
                 workingThread = Thread(target=runTask, args=(headers["task-id"], headers["file"], headers["start_frame"], headers["end_frame"]))
@@ -83,17 +73,6 @@ def runBlender(file: str, start_frame: int, end_frame: int):
     command += " -b" #doesn't work without
     command += " -a"
 
-    #command = ["\"" + config.blenderPath + "\"",
-    #            file,
-    #            config.blenderArgs, #TODO: check for invalid and disallowed args (like changing output format)
-    #            "-o",
-    #            config.outputPath,
-    #            "-s",
-    #            str(start_frame),
-    #            "-e",
-    #            str(end_frame),
-    #            "-b", #doesn't work without
-    #            "-a"]
 
     print("Launching Blender with command: " + str(command))
 
@@ -111,24 +90,6 @@ def runTask(task_id: str, file: str, start_frame: int, end_frame: int):
 
     runBlender(filename, start_frame, end_frame)
 
-def start_client(host: str, port: int):
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-    print(f'Verbunden mit dem Server an ' + host + ":" + str(port))
-    
-    # Daten vom Server empfangen
-    received_data = client_socket.recv(256) # mehr als genug
-    
-    # Deserialisieren der empfangenen Daten
-    data = pickle.loads(received_data)
-    print(f'Daten empfangen: {data}')
-    print("Datei: " + data["file"])
-    
-    client_socket.close()
-
-    time.sleep(1)
-    download_file(host, port, data["file"], "testfile.blend")
-
 def listen(host: str, port: int):
     server_address = (host, port)
     httpd = HTTPServer(server_address, WorkerHTTPRequestHandler)
@@ -141,7 +102,7 @@ def register():
     connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
     data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
     connection.request('GET', CConsts.WORKERMGMT, headers=data) #TODO:send WorkerID if already assigned one
-    response = connection.getresponse()
+    response = connection.getresponse() #TODO:Add timeout and retry
 
     #Check if response belongs to request??
     if response.status == 200:
@@ -281,17 +242,12 @@ def parseArgs(args: list[str]):
 
 
 def main():
-    print(sys.argv)
-    #start_client("localhost", 65432)
-
     global config
 
     config = WCConfig.WCConfig()
     config.readFromJson(CONFIG_JSON_PATH)
 
     parseArgs(sys.argv)
-
-    #runBlender("0000_0000_0000_0000.blend", 0, 50)
 
     if (config.autoRegister):
         register(config.serverAddress, config.serverPort)

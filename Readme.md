@@ -1,14 +1,21 @@
 # Worker Client
 
-# Pass these arguments when calling main.py:
+## How to run
+1. Server: Start with 'py main.py' (for Server's main.py)
+2. Worker: Start with 'py main.py *[args(see below)]*' (for Worker's main.py)
+3. Worker: Enter 'r' or 'register' when prompted to enter command (alternatively add '-ar' or '-autoregister' to Worker args)
+4. Wait until registration is complete (can take several seconds)
+5. Server: Press enter to send file
 
-Windows:    -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "C:\Program Files\Blender Foundation\[Folder of Blender Version]\blender.exe"
-MacOS:      -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "/Applications/Blender.app/Contents/MacOs/Blender"
-Linux:      -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "[Path to Blender]/blender"
+### Pass these arguments when calling Workers' main.py:
 
-You will probably have to adjust the blender path
+- Windows:    -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "C:\Program Files\Blender Foundation\*[Folder of Blender Version]*\blender.exe"
+- MacOS:      -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "/Applications/Blender.app/Contents/MacOs/Blender"
+- Linux:      -d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "*[Path to Blender]*/blender"
 
-# Probleme:
+Don't forget to adjust the blender path
+
+## Probleme:
 - Beim Starten der main.py des Workers mit PyCharm über die Run- oder Debug-Aktionen wird das Rendering in Blender nicht
 ausgeführt. Blender kommt nicht weiter als bis zum Laden der userpref.blend. Beim Aufruf über das Terminal mit
 py main.py [args] funktioniert alles einwandfrei.
