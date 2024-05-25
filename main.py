@@ -74,17 +74,37 @@ def download_file(task_id: str, path: str) -> str:
     return filename
 
 def runBlender(file: str, start_frame: int, end_frame: int):
-    command = config.blenderPath
-    command += config.blenderArgs
-    command += " -o " + config.outputPath
+    command = "\"" + config.blenderPath + "\""
+    command += " \"" + os.path.abspath(file) + "\""
+    command += " " + config.blenderArgs #TODO: check for invalid and disallowed args (like changing output format)
+    command += " -o \"" + config.outputPath + "\""
     command += " -s " + str(start_frame)
     command += " -e " + str(end_frame)
-    command += " " + file
+    command += " -b" #doesn't work without
+    command += " -a"
 
-    subprocess.call(command, shell=True)
+    #command = ["\"" + config.blenderPath + "\"",
+    #            file,
+    #            config.blenderArgs, #TODO: check for invalid and disallowed args (like changing output format)
+    #            "-o",
+    #            config.outputPath,
+    #            "-s",
+    #            str(start_frame),
+    #            "-e",
+    #            str(end_frame),
+    #            "-b", #doesn't work without
+    #            "-a"]
+
+    print("Launching Blender with command: " + str(command))
+
+    subprocess.run(command, shell=True)
+    print("Finished Blender --------------------------------------------------------")
 
 def runTask(task_id: str, file: str, start_frame: int, end_frame: int):
+    print("CWD in runTask: " + os.getcwd())
+
     filename = download_file(task_id, file)
+    print(f"Does {filename} exist? " +  str(os.path.exists(filename)))
     if (filename == ""):
         print("Ending thread as no file was downloaded")
         return
@@ -134,6 +154,7 @@ def register():
 
     connection.close()
     #Start thread to listen to tasks
+    global listenerThread
     listenerThread = Thread(target=listen, args=(config.httpHost, config.httpPort))
     listenerThread.start()
     return
@@ -142,7 +163,7 @@ def loop():
     print("Entered loop")
     stop = False
     while not stop:
-        inp = input("> ")
+        inp = input("Enter command> ")
         if (inp.lower() == ("r" or "register")):
             if (isRegistered):
                 print("Already registered")
@@ -158,6 +179,8 @@ def loop():
             print(config.__dict__)
         else:
             print("Unknown command")
+
+        inp = ""
 
 def checkBlenderPath(blenderPath: str):
     if os.name == "nt":
@@ -258,8 +281,8 @@ def parseArgs(args: list[str]):
 
 
 def main():
+    print(sys.argv)
     #start_client("localhost", 65432)
-    #return
 
     global config
 
@@ -267,6 +290,8 @@ def main():
     config.readFromJson(CONFIG_JSON_PATH)
 
     parseArgs(sys.argv)
+
+    #runBlender("0000_0000_0000_0000.blend", 0, 50)
 
     if (config.autoRegister):
         register(config.serverAddress, config.serverPort)
