@@ -9,11 +9,12 @@
 
 ### Pass these arguments when calling Workers' main.py:
 
-- Windows:    `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "C:\Program Files\Blender Foundation\[Folder of Blender Version]\blender.exe"`
-- MacOS:      `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "/Applications/Blender.app/Contents/MacOs/Blender"`
-- Linux:      `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "[Path to Blender]/blender"`
+- Windows:    `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "C:\Program Files\Blender Foundation\[Folder of Blender Version]\blender.exe" -outputpath "C:\Users\[Username]/Desktop/boomOut"`
+- MacOS:      `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "/Applications/Blender.app/Contents/MacOs/Blender" -outputpath ~"/Desktop/boomOut"`
+- Linux:      `-d -server localhost -port 65431 -httphost localhost -httpport 65432 -blenderpath "[Path to Blender]/blender" -outputpath [output path]`
 
-Don't forget to adjust the blender path
+Don't forget to adjust the blender path and output path
+Hint for UNIX-based systems: When referring to current user's directory write `~` in front of "". Otherwise it is considered a folder/file name.
 
 ## Probleme:
 - Beim Starten der main.py des Workers mit PyCharm über die Run- oder Debug-Aktionen wird das Rendering in Blender nicht

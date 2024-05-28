@@ -181,31 +181,33 @@ def checkBlenderPath(blenderPath: str):
 
 def getArgValue(message: str, args: list[str], index: int):
     if (index == len(args)):    
-        print("No " + message + " specified after "  + str(args[index- 1]))
+        print("No " + message + " specified after " + str(args[index - 1]))
         exit()
-    
+
     return args[index]
 
 def parseArgs(args: list[str]):
     global config
     dumpConfig: bool = False
+    print(args)
 
-    for i in range(1, len(args)):
-        if (args[i].lower() == ("-h" or "-help")):
+    i = 1
+    while i < len(args): # instead of for-loop because setting i inside the loop wouldn't affect iterator variable i
+        if (args[i].lower() in {"-h", "-help"}):
             print("Available command line arguments:")
 
-        elif (args[i].lower() == ("-d" or "-dump" or "-dc" or "-dumpconfig")):
+        elif (args[i].lower() in {"-d", "-dump", "-dc", "-dumpconfig"}):
             dumpConfig = True
 
-        elif (args[i].lower() == ("-ar" or "-autoregister")):
+        elif (args[i].lower() in {"-ar", "-autoregister"}):
             config.autoRegister = True
 
-        elif (args[i].lower() == ("-s" or "-server")):
+        elif (args[i].lower() in {"-s", "-server"}):
             i += 1
             config.serverAddress = getArgValue("server address", args, i)
             #TODO(maybe): check for address validity
 
-        elif (args[i].lower() == ("-p" or "-port")):
+        elif (args[i].lower() in {"-p", "-port"}):
             i += 1
             port = getArgValue("server port", args, i)
             try:
@@ -227,15 +229,24 @@ def parseArgs(args: list[str]):
                 print("Failed to parse HTTP port to integer: " + port)
                 exit()
 
-        elif (args[i].lower() == ("-b" or "-blender" or "-blenderpath")):
+        elif (args[i].lower() in {"-b", "-blender", "-blenderpath"}):
             i += 1
             config.blenderPath = getArgValue("blender path", args, i)
             config.blenderPath = checkBlenderPath(config.blenderPath)
 
-        elif (args[i].lower() == ("-ba" or "-bargs" or "-blenderargs")):
+        elif (args[i].lower() in {"-ba", "-bargs", "-blenderargs"}):
             i += 1
             config.blenderArgs = getArgValue("blender args", args, i)
             #Valiate blender args ??
+
+        elif (args[i].lower() in {"-o", "-out", "-output", "-outputpath"}):
+            i += 1
+            config.outputPath = getArgValue("output path", args, i)
+
+        else:
+            print("Unknown argument: " + args[i])
+
+        i += 1
 
     if (dumpConfig):
         config.saveToJson(CONFIG_JSON_PATH)
