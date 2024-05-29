@@ -23,7 +23,7 @@ class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
         if self.path == CConsts.STARTTASK:
             global workingThread
             if (workingThread is not None and workingThread.isAlive()):
-                print(f"Worker thread already running. Ignoring \"{CConsts.STARTTASK}\" request") #TODO:(maybe) implement queueing
+                print(f"Worker thread already running. Ignoring \"{CConsts.STARTTASK}\" request")  # TODO:(maybe) implement queueing
                 self.send_error(500, f"Worker already working. Ignored request")
                 return
 
@@ -34,7 +34,7 @@ class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
                 workingThread.start()
                 print("Started working thread")
                 self.send_response(200)
-                self.end_headers() # necessary to send
+                self.end_headers()  # necessary to send
                 return
             else:
                 print("Missing information in request body")
@@ -66,11 +66,11 @@ def download_file(task_id: str, path: str) -> str:
 def runBlender(file: str, start_frame: int, end_frame: int):
     command = "\"" + config.blenderPath + "\""
     command += " \"" + os.path.abspath(file) + "\""
-    command += " " + config.blenderArgs #TODO: check for invalid and disallowed args (like changing output format)
+    command += " " + config.blenderArgs  # TODO: check for invalid and disallowed args (like changing output format)
     command += " -o \"" + config.outputPath + "\""
     command += " -s " + str(start_frame)
     command += " -e " + str(end_frame)
-    command += " -b" #doesn't work without
+    command += " -b"  # doesn't work without
     command += " -a"
 
 
@@ -98,13 +98,13 @@ def listen(host: str, port: int):
     return
 
 def register():
-    #Register at server as available worker
+    # Register at server as available worker
     connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
     data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
-    connection.request('GET', CConsts.WORKERMGMT, headers=data) #TODO:send WorkerID if already assigned one
-    response = connection.getresponse() #TODO:Add timeout and retry
+    connection.request('GET', CConsts.WORKERMGMT, headers=data) # TODO:send WorkerID if already assigned one
+    response = connection.getresponse() # TODO:Add timeout and retry
 
-    #Check if response belongs to request??
+    # Check if response belongs to request??
     if response.status == 200:
         responseData = response.read()
         print("Registration sucessful: " + responseData.decode("utf-8"))
@@ -114,7 +114,7 @@ def register():
         print(f'Registration failed: {response.status} {response.reason}')
 
     connection.close()
-    #Start thread to listen to tasks
+    # Start thread to listen to tasks
     global listenerThread
     listenerThread = Thread(target=listen, args=(config.httpHost, config.httpPort))
     listenerThread.start()
@@ -131,9 +131,10 @@ def loop():
             else:
                 register()
         elif (inp.lower() == ("q" or "quit")):
-            stop = True
+            # Quit after current task finishes (if one is running)
+            stop = True # Placeholder
         elif (inp.lower() == ("fq" or "forcequit")):
-            #send forcequitted to server
+            # Send forcequitted to server and cancel current task
             exit()
         elif (inp.lower() == ("sc" or "showconfig")):
             global config
@@ -148,7 +149,7 @@ def checkBlenderPath(blenderPath: str):
         if os.path.isdir(blenderPath):
             blenderPath = os.path.join(blenderPath, "blender.exe")
         
-        #else if isfile(blenderPath):
+        # else if isfile(blenderPath):
         elif not blenderPath.endswith(".exe"):
             print("The file which was passed as Blender path is no executable")
             exit()
@@ -172,8 +173,8 @@ def checkBlenderPath(blenderPath: str):
         if not os.access(blenderPath, os.X_OK):
             print("Not executable: " + blenderPath)
             exit()
-            #TODO: Test if <blenderPath> is definitely an executable progra
-    else: # java (?)
+            # TODO: Test if <blenderPath> is definitely an executable progra
+    else:  # java (?)
         print("Unsupported platform: " + os.name)
         exit()
     
@@ -192,7 +193,7 @@ def parseArgs(args: list[str]):
     print(args)
 
     i = 1
-    while i < len(args): # instead of for-loop because setting i inside the loop wouldn't affect iterator variable i
+    while i < len(args):  # instead of for-loop because setting i inside the loop wouldn't affect iterator variable i
         if (args[i].lower() in {"-h", "-help"}):
             print("Available command line arguments:")
 
@@ -205,7 +206,7 @@ def parseArgs(args: list[str]):
         elif (args[i].lower() in {"-s", "-server"}):
             i += 1
             config.serverAddress = getArgValue("server address", args, i)
-            #TODO(maybe): check for address validity
+            # TODO(maybe): check for address validity
 
         elif (args[i].lower() in {"-p", "-port"}):
             i += 1
@@ -237,7 +238,7 @@ def parseArgs(args: list[str]):
         elif (args[i].lower() in {"-ba", "-bargs", "-blenderargs"}):
             i += 1
             config.blenderArgs = getArgValue("blender args", args, i)
-            #Valiate blender args ??
+            # Validate blender args ??
 
         elif (args[i].lower() in {"-o", "-out", "-output", "-outputpath"}):
             i += 1
