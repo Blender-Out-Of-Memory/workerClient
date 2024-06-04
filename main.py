@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import platform
 import subprocess
 import http.client
@@ -29,8 +30,16 @@ class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
 
             headers = self.headers
 
-            if (("task-id" and "file" and "start_frame" and "end_frame") in headers):
-                workingThread = Thread(target=runTask, args=(headers["task-id"], headers["file"], headers["start_frame"], headers["end_frame"]))
+            if (all(field in headers for field in ("task-id", "file", "start_frame", "end_frame", "frame_step"))):
+                try:
+                    start_frame = int(headers["start_frame"])
+                    end_frame = int(headers["end_frame"])
+                    frame_step = int(headers["frame_step"])
+                except:
+                    print("Failed to parse frame range to int")
+                    self.send_error(500, f"Failed to parse frame range to int")
+                    return
+                workingThread = Thread(target=runTask, args=(headers["task-id"], headers["file"], start_frame, end_frame, frame_step))
                 workingThread.start()
                 print("Started working thread")
                 self.send_response(200)
@@ -63,7 +72,21 @@ def download_file(task_id: str, path: str) -> str:
     conn.close()
     return filename
 
-def runBlender(file: str, start_frame: int, end_frame: int):
+def evaluteBlenderCLOutput(message: str):
+    num = ""
+
+    if (message.startswith("Append frame")):
+        for i in range(len(message) - 2, 0, -1):  # -2 to skip \n
+            if (not message[i].isdigit()):
+                break
+
+            num = message[i] + num
+
+        return int(num)
+
+    return None
+
+def runBlender(file: str, start_frame: int, end_frame: int, frame_step: int):
     command = "\"" + config.blenderPath + "\""
     command += " \"" + os.path.abspath(file) + "\""
     command += " " + config.blenderArgs  # TODO: check for invalid and disallowed args (like changing output format)
@@ -76,10 +99,25 @@ def runBlender(file: str, start_frame: int, end_frame: int):
 
     print("Launching Blender with command: " + str(command))
 
-    subprocess.run(command, shell=True)
+    blenderProcess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,)
+    totalFrames = int((end_frame - start_frame) / frame_step)
+    while (True):
+        line = blenderProcess.stdout.readline()
+        if not line and blenderProcess.poll() is not None:
+            break
+        else:
+            # print(line) # outsource to new terminal window to keep this one clean
+            frame = evaluteBlenderCLOutput(line.decode("utf-8"))
+            if (frame is not None):
+                relativeFrame = int((frame - start_frame) / frame_step)
+                progress = (relativeFrame + 1) / (totalFrames + 1) * 100
+                print(f"Frame {relativeFrame} / {totalFrames} | {frame} in {start_frame} - {end_frame} | {progress:.2f}%")
+
+        time.sleep(0.05)  # TODO: increase sleep time and skip printint for frames rendered in the meantime
+
     print("Finished Blender --------------------------------------------------------")
 
-def runTask(task_id: str, file: str, start_frame: int, end_frame: int):
+def runTask(task_id: str, file: str, start_frame: int, end_frame: int, frame_step: int):
     print("CWD in runTask: " + os.getcwd())
 
     filename = download_file(task_id, file)
@@ -88,7 +126,7 @@ def runTask(task_id: str, file: str, start_frame: int, end_frame: int):
         print("Ending thread as no file was downloaded")
         return
 
-    runBlender(filename, start_frame, end_frame)
+    runBlender(filename, start_frame, end_frame, frame_step)
 
 def listen(host: str, port: int):
     server_address = (host, port)
@@ -143,6 +181,7 @@ def loop():
             print("Unknown command")
 
         inp = ""
+        time.sleep(0.05)  # reduce performance impact of while(True)-loop
 
 def checkBlenderPath(blenderPath: str):
     if os.name == "nt":
@@ -262,7 +301,7 @@ def main():
     parseArgs(sys.argv)
 
     if (config.autoRegister):
-        register(config.serverAddress, config.serverPort)
+        register()
 
     loop()
 
