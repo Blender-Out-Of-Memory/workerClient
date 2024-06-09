@@ -10,7 +10,7 @@ MUST-DO mit (!) gekennzeichnet
 ### Kommunikation
 - weitere Befehle des Servers entgegennehmen (Task stoppen, Task-Fortschritt-Abfrage (falls nicht vom Worker an Server gesendet), Server-seitige Deregistrierung, etc.)
 - Task-Fortschritt an Server schicken (falls nicht von diesem aus abgefragt werden soll)
-- (!!) Render-Output an Server schicken
+- ~~(!!) Render-Output an Server schicken~~
 - bei Empfang eines STARTTASK-Befehls obwohl Task läuft (Serverfehler), Task (mit Begründung) ablehnen
 
 ### Funktionalität

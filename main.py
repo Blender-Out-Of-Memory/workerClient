@@ -8,6 +8,7 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 
 import WCConfig
+from RenderTask import RenderTask, RenderOutputType
 import CommunicationConstants as CConsts
 
 CONFIG_JSON_PATH = "config.json"
@@ -28,54 +29,49 @@ class WorkerHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.send_error(500, f"Worker already working. Ignored request")
                 return
 
-            headers = self.headers
+            task = RenderTask.from_headers(self.headers) # TODO: ensure self.headers is usable like a dictionary
+            if (type(task) is str):
+                print(task)
+                self.send_error(500, f"Error during {CConsts.STARTTASK} header parsing: {task}")
+                return
 
-            if (all(field in headers for field in ("task-id", "file", "start_frame", "end_frame", "frame_step"))):
-                try:
-                    start_frame = int(headers["start_frame"])
-                    end_frame = int(headers["end_frame"])
-                    frame_step = int(headers["frame_step"])
-                except:
-                    print("Failed to parse frame range to int")
-                    self.send_error(500, f"Failed to parse frame range to int")
-                    return
-                workingThread = Thread(target=runTask, args=(headers["task-id"], headers["file"], start_frame, end_frame, frame_step))
-                workingThread.start()
-                print("Started working thread")
-                self.send_response(200)
-                self.end_headers()  # necessary to send
-                return
-            else:
-                print("Missing information in request body")
-                self.send_error(500, f"Missing information in request body")
-                return
+            # else: type(task) is RenderTask
+            workingThread = Thread(target=run_task, args=(task,)) # comma after task to make it a tuple so it's iterable
+            workingThread.start()
+            print("Started working thread")
+            self.send_response(200)
+            self.end_headers()  # necessary to send
 
         else:
-            print("Unknown request (path)")
+            self.send_error(404, f"Unknown request: {self.path}")
+            print(f"Unknown request: {self.path}")
 
 
-def download_file(task_id: str, path: str) -> str:
-    conn = http.client.HTTPConnection(config.serverAddress, config.serverPort)
-    conn.request('GET', path)
-    response = conn.getresponse()
+def download_file(task: RenderTask) -> bool:
+    connection = http.client.HTTPConnection(task.FileServerAddress, task.FileServerPort)
+    connection.request("GET", "blenderdata", headers={"Task-ID": task.TaskID})
+    response = connection.getresponse()
 
-    filename = task_id + ".blend"
+    path = f"{task.get_folder()}/blenderfiles"
     if response.status == 200:
-        with open(filename, 'wb') as file:
+        os.makedirs(path, exist_ok=True)
+        path += f"/{task.get_filename()}"
+        with open(path, "wb+") as file:
             file.write(response.read())
-        print('Downloaded file successfully.')
-        return filename
+
+        print("Downloaded file successfully.")
+        success = True
     else:
-        print(f'Error downloading file: {response.status} {response.reason}')
-        filename = ""
+        print(f"Error downloading file: {response.status} {response.reason}")
+        success = False
 
-    conn.close()
-    return filename
+    connection.close()
+    return success
 
-def evaluteBlenderCLOutput(message: str):
+def evalute_blender_cl_output(message: str):
     num = ""
 
-    if (message.startswith("Append frame")):
+    if (message.startswith("Append frame")):  # for videos
         for i in range(len(message) - 2, 0, -1):  # -2 to skip \n
             if (not message[i].isdigit()):
                 break
@@ -84,54 +80,112 @@ def evaluteBlenderCLOutput(message: str):
 
         return int(num)
 
+    elif (message.startswith("Saved:")):  # for images
+        readDigit = False
+        for i in range(len(message) - 2, 0, -1):
+            if (not message[i].isdigit()):
+                if readDigit:
+                    break
+                else:
+                    continue
+
+            readDigit = True
+            num = message[i] + num
+
+        return int(num)
+
     return None
 
-def runBlender(file: str, start_frame: int, end_frame: int, frame_step: int):
-    command = "\"" + config.blenderPath + "\""
-    command += " \"" + os.path.abspath(file) + "\""
-    command += " " + config.blenderArgs  # TODO: check for invalid and disallowed args (like changing output format)
-    command += " -o \"" + config.outputPath + "\""
-    command += " -s " + str(start_frame)
-    command += " -e " + str(end_frame)
-    command += " -b"  # doesn't work without
-    command += " -a"
+def send_render_output(task: RenderTask, frame: int):
+    connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
+    filepath = f"{task.get_folder()}/renderoutput/"
+    if (frame == -1):  # video
+        # filepath += ####-####
+        filepath += f"{str(task.StartFrame).zfill(len(str(task.EndFrame)))}-{str(task.EndFrame).zfill(len(str(task.EndFrame)))}"
+        frameInfo = f"{str(task.StartFrame)}-{str(task.EndFrame)}"
+
+    else:
+        # filepath += ####
+        filepath += f"{str(frame).zfill(len(str(task.EndFrame)))}"
+        frameInfo = str(frame)
+
+    with open(filepath, "rb") as file:
+        file.seek(0, os.SEEK_END)
+        headers = {"Content-Type": "application/octet-stream", "Content-Length": str(file.tell()), "Task-ID": task.TaskID, "Worker-ID": "DEF", "Frame-Info": frameInfo}
+        file.seek(0)
+        connection.request("PUT", body=file.read(), headers=headers, url="")
+    response = connection.getresponse()  # TODO:Add timeout and retry
+    # TODO: Add error handling
+    connection.close()
+    print(f"Successfully sent frame(s) {frameInfo} to server")
+
+def run_blender(task: RenderTask):
+    command  = f"\"{config.blenderPath}\""
+    command += f" \"{task.get_folder()}/blenderfiles/{task.get_filename()}\""
+    command += f" {config.blenderArgs}"  # TODO: check for invalid and disallowed args (like changing output format)
+
+    outputPath = f"{task.get_folder()}/renderoutput"
+    os.makedirs(outputPath, exist_ok=True)
+    outputPath += "/" + "#" * len(str(task.EndFrame))
+    command += f" -o \"{outputPath}\""
+
+    command += f" -x 0"
+    command += f" -s {str(task.StartFrame)}"
+    command += f" -e {str(task.EndFrame)}"
+    command += f" -b"  # doesn't work without
+    command += f" -a"
 
 
-    print("Launching Blender with command: " + str(command))
+    print(f"Launching Blender with command: {str(command)}")
 
-    blenderProcess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,)
-    totalFrames = int((end_frame - start_frame) / frame_step)
-    while (True):
+    blenderProcess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    totalFrames = int((task.EndFrame - task.StartFrame) / task.FrameStep)
+    lines = []
+    writtenAnything = False
+    blenderRunning = True
+    while (blenderRunning):
+        errorLine = blenderProcess.stderr.readline()
+        if errorLine:
+            print(errorLine)
+
         line = blenderProcess.stdout.readline()
-        if not line and blenderProcess.poll() is not None:
-            break
+        lines.append(line)
+        if not line and blenderProcess.poll() is not None:  # read return code (has blender quit successfully)
+            blenderRunning = False
         else:
             # print(line) # outsource to new terminal window to keep this one clean
-            frame = evaluteBlenderCLOutput(line.decode("utf-8"))
+            frame = evalute_blender_cl_output(line.decode("utf-8"))
             if (frame is not None):
-                relativeFrame = int((frame - start_frame) / frame_step)
+                writtenAnything = True
+                if not (task.OutputType.is_video()):
+                    Thread(target=send_render_output, args=(task, frame)).start()
+                relativeFrame = int((frame - task.StartFrame) / task.FrameStep)
                 progress = (relativeFrame + 1) / (totalFrames + 1) * 100
-                print(f"Frame {relativeFrame} / {totalFrames} | {frame} in {start_frame} - {end_frame} | {progress:.2f}%")
+                print(f"Frame {relativeFrame} / {totalFrames} | {frame} in {task.StartFrame} - {task.EndFrame} | {progress:.2f}%")
 
-        time.sleep(0.05)  # TODO: increase sleep time and skip printint for frames rendered in the meantime
+        time.sleep(0.1)
 
+    if (task.OutputType.is_video()):
+        Thread(target=send_render_output, args=(task, -1)).start()
     print("Finished Blender --------------------------------------------------------")
+    if not writtenAnything:
+        for line in lines:  # Probably error messages
+            print(line)
 
-def runTask(task_id: str, file: str, start_frame: int, end_frame: int, frame_step: int):
+def run_task(task: RenderTask):
     print("CWD in runTask: " + os.getcwd())
 
-    filename = download_file(task_id, file)
-    print(f"Does {filename} exist? " +  str(os.path.exists(filename)))
-    if (filename == ""):
-        print("Ending thread as no file was downloaded")
+    downloaded = download_file(task)
+    if not downloaded:
+        print("Ending thread because no file was downloaded")
         return
 
-    runBlender(filename, start_frame, end_frame, frame_step)
+    run_blender(task)
 
 def listen(host: str, port: int):
     server_address = (host, port)
     httpd = HTTPServer(server_address, WorkerHTTPRequestHandler)
-    print(f'Listener runs at {host}:{port}')
+    print(f"Listener runs at {host}:{port}")
     httpd.serve_forever()
     return
 
@@ -139,7 +193,7 @@ def register():
     # Register at server as available worker
     connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
     data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
-    connection.request('GET', CConsts.WORKERMGMT, headers=data) # TODO:send WorkerID if already assigned one
+    connection.request("GET", CConsts.WORKERMGMT, headers=data) # TODO:send WorkerID if already assigned one
     response = connection.getresponse() # TODO:Add timeout and retry
 
     # Check if response belongs to request??
@@ -149,7 +203,7 @@ def register():
         global isRegistered
         isRegistered = True
     else:
-        print(f'Registration failed: {response.status} {response.reason}')
+        print(f"Registration failed: {response.status} {response.reason}")
 
     connection.close()
     # Start thread to listen to tasks
@@ -183,7 +237,7 @@ def loop():
         inp = ""
         time.sleep(0.05)  # reduce performance impact of while(True)-loop
 
-def checkBlenderPath(blenderPath: str):
+def check_blender_path(blenderPath: str):
     if os.name == "nt":
         if os.path.isdir(blenderPath):
             blenderPath = os.path.join(blenderPath, "blender.exe")
@@ -219,14 +273,14 @@ def checkBlenderPath(blenderPath: str):
     
     return blenderPath
 
-def getArgValue(message: str, args: list[str], index: int):
+def get_arg_value(message: str, args: list[str], index: int):
     if (index == len(args)):    
         print("No " + message + " specified after " + str(args[index - 1]))
         exit()
 
     return args[index]
 
-def parseArgs(args: list[str]):
+def parse_args(args: list[str]):
     global config
     dumpConfig: bool = False
     print(args)
@@ -244,12 +298,12 @@ def parseArgs(args: list[str]):
 
         elif (args[i].lower() in {"-s", "-server"}):
             i += 1
-            config.serverAddress = getArgValue("server address", args, i)
+            config.serverAddress = get_arg_value("server address", args, i)
             # TODO(maybe): check for address validity
 
         elif (args[i].lower() in {"-p", "-port"}):
             i += 1
-            port = getArgValue("server port", args, i)
+            port = get_arg_value("server port", args, i)
             try:
                 config.serverPort = int(port)
             except:
@@ -258,11 +312,11 @@ def parseArgs(args: list[str]):
 
         elif (args[i].lower() == "-httphost"):
             i += 1
-            config.httpHost = getArgValue("HTTP host", args, i)
+            config.httpHost = get_arg_value("HTTP host", args, i)
 
         elif (args[i].lower() == "-httpport"):
             i += 1
-            port = getArgValue("HTTP port", args, i)
+            port = get_arg_value("HTTP port", args, i)
             try:
                 config.httpPort = int(port)
             except:
@@ -271,17 +325,17 @@ def parseArgs(args: list[str]):
 
         elif (args[i].lower() in {"-b", "-blender", "-blenderpath"}):
             i += 1
-            config.blenderPath = getArgValue("blender path", args, i)
-            config.blenderPath = checkBlenderPath(config.blenderPath)
+            config.blenderPath = get_arg_value("blender path", args, i)
+            config.blenderPath = check_blender_path(config.blenderPath)
 
         elif (args[i].lower() in {"-ba", "-bargs", "-blenderargs"}):
             i += 1
-            config.blenderArgs = getArgValue("blender args", args, i)
+            config.blenderArgs = get_arg_value("blender args", args, i)
             # Validate blender args ??
 
         elif (args[i].lower() in {"-o", "-out", "-output", "-outputpath"}):
             i += 1
-            config.outputPath = getArgValue("output path", args, i)
+            config.outputPath = get_arg_value("output path", args, i)
 
         else:
             print("Unknown argument: " + args[i])
@@ -298,7 +352,7 @@ def main():
     config = WCConfig.WCConfig()
     config.readFromJson(CONFIG_JSON_PATH)
 
-    parseArgs(sys.argv)
+    parse_args(sys.argv)
 
     if (config.autoRegister):
         register()
