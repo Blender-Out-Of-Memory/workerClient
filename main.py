@@ -194,7 +194,7 @@ def register():
     # Register at server as available worker
     MAX_RETRIES = 3
     TIMEOUT = 5  # timeout after x (here: 5) seconds
-    retry_count = MAX_RETRIES
+    retry_count = 0
     while retry_count < MAX_RETRIES:   # iterating through MAX_RETRIES possible retries
         connection = None   # ensuring connection is defined (for the finally block)
         try:
