@@ -1,4 +1,5 @@
 import os
+import socket
 import sys
 import time
 import platform
@@ -191,21 +192,42 @@ def listen(host: str, port: int):
 
 def register():
     # Register at server as available worker
-    connection = http.client.HTTPConnection(config.serverAddress, config.serverPort)
-    data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
-    connection.request("GET", CConsts.WORKERMGMT, headers=data) # TODO:send WorkerID if already assigned one
-    response = connection.getresponse() # TODO:Add timeout and retry
+    MAX_RETRIES = 3
+    TIMEOUT = 5  # timeout after x (here: 5) seconds
+    retry_count = MAX_RETRIES
+    while retry_count < MAX_RETRIES:   # iterating through MAX_RETRIES possible retries
+        connection = None   # ensuring connection is defined (for the finally block)
+        try:
+            # usual connection-work and response processing
+            connection = http.client.HTTPConnection(config.serverAddress, config.serverPort, timeout=TIMEOUT)
+            data = {"Action": CConsts.REGISTER, "Host": config.httpHost, "Port": config.httpPort}
+            connection.request("GET", CConsts.WORKERMGMT, headers=data) # TODO:send WorkerID if already assigned one
+            response = connection.getresponse()
 
-    # Check if response belongs to request??
-    if response.status == 200:
-        responseData = response.read()
-        print("Registration sucessful: " + responseData.decode("utf-8"))
-        global isRegistered
-        isRegistered = True
-    else:
-        print(f"Registration failed: {response.status} {response.reason}")
+            # Check whether response belongs to request??
+            if response.status == 200:
+                responseData = response.read()
+                print("Registration sucessful: " + responseData.decode("utf-8"))
+                global isRegistered
+                isRegistered = True
+            else:
+                print(f"Registration failed: {response.status} {response.reason}")
+        except socket.timeout as e:   # did response timeout?
+            retry_count += 1
+            print(f"Socket timeout, retrying {retry_count}/{MAX_RETRIES}...")
+            if retry_count >= MAX_RETRIES:
+                print("Max retries reached, unable to get response.")
+        except http.client.HTTPException as e:
+            print("HTTP exception:", e)
+            break
+        except Exception as e:
+            print("Other exception:", e)
+            break
+        finally:
+            # Close the connection if it was opened
+            if connection is not None:
+                connection.close()
 
-    connection.close()
     # Start thread to listen to tasks
     global listenerThread
     listenerThread = Thread(target=listen, args=(config.httpHost, config.httpPort))
