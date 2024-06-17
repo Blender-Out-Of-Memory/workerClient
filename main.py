@@ -219,14 +219,13 @@ def register():
                 print("Max retries reached, unable to get response.")
         except http.client.HTTPException as e:
             print("HTTP exception:", e)
-            break
         except Exception as e:
             print("Other exception:", e)
-            break
         finally:
             # Close the connection if it was opened
             if connection is not None:
                 connection.close()
+                break
 
     # Start thread to listen to tasks
     global listenerThread
