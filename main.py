@@ -195,7 +195,7 @@ def register():
     MAX_RETRIES = 3
     TIMEOUT = 5  # timeout after x (here: 5) seconds
     retry_count = 0
-    while retry_count < MAX_RETRIES:   # iterating through MAX_RETRIES possible retries
+    while retry_count < MAX_RETRIES and isRegistered is not True:   # iterating through MAX_RETRIES possible retries
         connection = None   # ensuring connection is defined (for the finally block)
         try:
             # usual connection-work and response processing
@@ -219,13 +219,20 @@ def register():
                 print("Max retries reached, unable to get response.")
         except http.client.HTTPException as e:
             print("HTTP exception:", e)
+            # Close the connection if it was opened
+            if connection is not None:
+                connection.close()
+            break
         except Exception as e:
             print("Other exception:", e)
+            # Close the connection if it was opened
+            if connection is not None:    # bloated code but functionally nice
+                connection.close()
+            break
         finally:
             # Close the connection if it was opened
             if connection is not None:
                 connection.close()
-                break
 
     # Start thread to listen to tasks
     global listenerThread
