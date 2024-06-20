@@ -195,8 +195,9 @@ def register():
     MAX_RETRIES = 3
     TIMEOUT = 5  # timeout after x (here: 5) seconds
     retry_count = 0
-    while retry_count < MAX_RETRIES and isRegistered is not True:   # iterating through MAX_RETRIES possible retries
-        connection = None   # ensuring connection is defined (for the finally block)
+    global isRegistered
+    while retry_count < MAX_RETRIES and not isRegistered:  # iterating through MAX_RETRIES possible retries
+        connection = None  # ensuring connection is defined (for the finally block)
         try:
             # usual connection-work and response processing
             connection = http.client.HTTPConnection(config.serverAddress, config.serverPort, timeout=TIMEOUT)
@@ -207,8 +208,7 @@ def register():
             # Check whether response belongs to request??
             if response.status == 200:
                 responseData = response.read()
-                print("Registration sucessful: " + responseData.decode("utf-8"))
-                global isRegistered
+                print("Registration successful: " + responseData.decode("utf-8"))
                 isRegistered = True
             else:
                 print(f"Registration failed: {response.status} {response.reason}")
