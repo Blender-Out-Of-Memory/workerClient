@@ -38,7 +38,7 @@ class Manager:
 	def send_frame(frame: int):
 		headers = Manager.currentTask.get_identifying_header(Manager.WorkerID)
 		headers["Frame"] = str(frame)
-		message = Message.Message(HTTPMethod.POST, "worker_manager/post-render-result",
+		message = Message.Message(HTTPMethod.POST, "/worker_manager/post-render-result/",
 								  headers, retries=-1, bodyFilepath=Manager.currentTask.get_render_result_path(frame))
 
 		Sender.add_message(message, False)
@@ -51,7 +51,8 @@ class Manager:
 	@staticmethod
 	def registered(response: HTTPResponse, args: Sequence):
 		Manager.Status = Status.Available
-		print("Registered successfully")
+		workerID = response.headers["Worker-Id"]
+		print(f"Registered successfully with WorkerID {workerID}")
 		Manager.registering = False
 		if (Manager.Status == Status.Quitting):
 			Manager.Status = Status.Working
@@ -62,7 +63,7 @@ class Manager:
 		Manager.workingThread.start()
 
 	@staticmethod
-	def register():
+	def register(listenerHost: str, listenerPort: int):
 		if Manager.Status.is_registered():
 			print("Already registered")
 			return
@@ -72,9 +73,10 @@ class Manager:
 			return
 
 		Manager.registering = True
-		registerMessage = Message.Message(HTTPMethod.GET, "worker_manager/register", {"Task-ID": "?"},
-										  -1, Message.DEFAULT_TIMEOUT,
-										  Manager.registered, None)
+		performanceScore = 1  # TODO: calculate from hardware specs
+		registerMessage = Message.Message(HTTPMethod.GET, "/worker_manager/register/",
+										  {"Worker-Id": "?", "Host": str(listenerHost), "Port": str(listenerPort), "Performance-Score": performanceScore},
+										  retries=-1, onSuccess=Manager.registered)
 		Sender.add_message(registerMessage, True)
 	@staticmethod
 	def download_file(response: HTTPResponse, args: Sequence):
@@ -90,9 +92,9 @@ class Manager:
 
 	@staticmethod
 	def start_task(task: Task):
-		downloadRequest = Message.Message(HTTPMethod.GET, "worker_manager/download-blender-data", task.get_identifying_header(Manager.WorkerID),
-								  5, 5,
-								  Manager.download_file, (task,))
+		downloadRequest = Message.Message(HTTPMethod.GET, "/worker_manager/download-blender-data/", task.get_identifying_header(Manager.WorkerID),
+								  timeout=5, retries=5,
+								  onSuccess=Manager.download_file, onSuccessArgs=(task,))
 
 		Sender.add_message(downloadRequest, False)
 

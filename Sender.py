@@ -19,23 +19,34 @@ class Sender:
 	def send(message: Message) -> bool:
 		success = False
 		tries = 0
-		while not success and (message.Retries == -1 or tries < message.Retries):  # retry forever if Retries == -1
+		print(f"Sending message {message.URL}")
+		while (not success) and (message.Retries == -1 or tries < message.Retries):  # retry forever if Retries == -1
 			try:
 				connection = http.client.HTTPConnection(Sender.host, Sender.port, timeout=message.Timeout)
-				connection.request(Message.Method, message.URL, headers=message.Headers, body=message.Body)
+				connection.request(message.Method, message.URL, headers=message.Headers, body=message.Body)
 				response = connection.getresponse()
+
+				print("Got response: " + str(response.status))
+				print(response.read(100))
 				connection.close()
+
 				if response.status == 200:
 					success = True
 					if (message.OnSuccess):
-						Thread(target=message.OnSuccess, args=(response, message.OnSuccessArgs)).start()
+						try:
+							Thread(target=message.OnSuccess, args=(response, message.OnSuccessArgs)).start()
+						except:
+							print(f"onSuccess for message {message.URL} caused an exception")
+				else:
+					time.sleep(0.5)
 				# TODO: handle other statuses
-				tries += 1
 
 			except Exception as ex:
 				print(f"Exception occurred while trying to send message with URL {message.URL}")
 				print(ex)
+				time.sleep(1)
 
+			tries += 1
 		return success
 
 	@staticmethod

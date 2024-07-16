@@ -25,7 +25,7 @@ class Worker:
 		Worker.sendFrameCallback = sendFrameCb
 
 	@staticmethod
-	def evalute_blender_cl_output(message: str):
+	def evaluate_blender_cl_output(message: str):
 		num = ""
 
 		if (message.startswith("Append frame")):  # for videos
@@ -85,7 +85,7 @@ class Worker:
 				blenderRunning = False
 			else:
 				# print(line) # outsource to new terminal window to keep this one clean
-				frame = Worker.evalute_blender_cl_output(line.decode("utf-8"))
+				frame = Worker.evaluate_blender_cl_output(line.decode("utf-8"))
 				if (frame is not None):
 					writtenAnything = True
 					if not task.OutputType.is_video():

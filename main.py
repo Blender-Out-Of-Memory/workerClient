@@ -1,3 +1,4 @@
+import time
 from threading import Thread
 
 from Listener import Listener
@@ -21,8 +22,10 @@ def main():
 	senderThread = Thread(target=Sender.start, args=(SERVER_HOST, SERVER_PORT), daemon=True)
 	senderThread.start()
 
-	Manager.register()
-	# Registration
+	Manager.register(HOST, PORT)  # at server
+
+	while True:
+		time.sleep(0.1)
 
 
 main()

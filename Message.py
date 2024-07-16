@@ -26,7 +26,7 @@ class Message:
 	def __init__(self, method: HTTPMethod, url: str,
 				 headers: Dict, bodyFilepath: str = None,
 				 retries: int = DEFAULT_RETRIES, timeout: float = DEFAULT_TIMEOUT,
-				 onSuccess: Optional[Callable[[HTTPResponse, Sequence], Any]] = None, onSuccessArgs: Sequence = None):
+				 onSuccess: Callable[[HTTPResponse, Sequence], Any] = None, onSuccessArgs: Sequence = None):
 		self.Method = method
 		self.URL = url
 		self.Headers = headers

@@ -25,9 +25,9 @@ class Task:
 
 	def get_identifying_header(self, workerID: str) -> Dict:
 		return {
-			"Task-ID": self.TaskID,
+			"Task-Id": self.TaskID,
 			"Subtask-Index": self.SubtaskIndex,
-			"Worker-ID": workerID
+			"Worker-Id": workerID
 		}
 
 	def get_folder(self):
@@ -51,12 +51,12 @@ class Task:
 
 	@classmethod
 	def from_headers(cls, headers) -> Tuple:
-		difference = {"Task-ID", "Subtask-Index", "File-Server-Address", "File-Server-Port", "Blender-Data-Type", "Output-Type", "Start-Frame", "End-Frame", "Frame-Step"}.difference(headers)
+		difference = {"Task-Id", "Subtask-Index", "File-Server-Address", "File-Server-Port", "Blender-Data-Type", "Output-Type", "Start-Frame", "End-Frame", "Frame-Step"}.difference(headers)
 		if not difference:  # difference is empty
 			return (f"Missing header fields for creation of Task: {", ".join(difference)}", HTTPStatus.BAD_REQUEST)
 
 		# Check TaskID
-		taskID = headers["Task-ID"]
+		taskID = headers["Task-Id"]
 		if not _is_valid_id(taskID, "T-"):
 			return ("Invalid TaskID", HTTPStatus.BAD_REQUEST)
 
