@@ -16,13 +16,15 @@ BLENDER_PATH_BY_OS = {
 }
 
 class Worker:
-	getTaskCallback: Callable[[], Task] = None
 	sendFrameCallback: Callable[[int], None] = None
 
 	@staticmethod
 	def run(getTaskCb: Callable[[], Task], sendFrameCb: Callable[[int], None]):
-		Worker.getTaskCallback = getTaskCb
 		Worker.sendFrameCallback = sendFrameCb
+
+		while True:
+			task = getTaskCb()
+			Worker.run_blender(task)
 
 	@staticmethod
 	def evaluate_blender_cl_output(message: str):

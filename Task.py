@@ -7,7 +7,7 @@ from Enums import RenderOutputType, BlenderDataType
 
 
 def _is_valid_id(id: str, prefix: str) -> bool:
-	pattern = prefix + r"{prefix}[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}"
+	pattern = prefix + r"[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}"
 	return re.fullmatch(pattern, id) is not None
 
 
@@ -52,7 +52,7 @@ class Task:
 	@classmethod
 	def from_headers(cls, headers) -> Tuple:
 		difference = {"Task-Id", "Subtask-Index", "File-Server-Address", "File-Server-Port", "Blender-Data-Type", "Output-Type", "Start-Frame", "End-Frame", "Frame-Step"}.difference(headers)
-		if not difference:  # difference is empty
+		if difference:  # difference is not empty
 			return (f"Missing header fields for creation of Task: {", ".join(difference)}", HTTPStatus.BAD_REQUEST)
 
 		# Check TaskID
@@ -63,7 +63,7 @@ class Task:
 
 		# Check SubtaskIndex
 		try:
-			subtaskIndex = int(headers["Subtask.Index"])
+			subtaskIndex = int(headers["Subtask-Index"])
 		except:
 			return ("Invalid SubtaskIndex", HTTPStatus.BAD_REQUEST)
 
@@ -83,14 +83,14 @@ class Task:
 
 		# Check DataType
 		try:
-			dataType = BlenderDataType(headers["Blender-Data-Type"])
+			dataType = BlenderDataType.from_identifier(headers["Blender-Data-Type"])
 		except:
 			return ("Invalid DataType", HTTPStatus.BAD_REQUEST)
 
 
 		# Check OutputType
 		try:
-			outputType = RenderOutputType(headers["Output-Type"])
+			outputType = RenderOutputType.from_identifier(headers["Output-Type"])
 		except:
 			return ("Invalid OutputType", HTTPStatus.BAD_REQUEST)
 

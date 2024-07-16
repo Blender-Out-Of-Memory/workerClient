@@ -23,7 +23,7 @@ class Listener(SimpleHTTPRequestHandler):
 			self.send_response(result[1], result[0])
 			self.end_headers()
 
-			if (result[0] == HTTPStatus.OK):
+			if (result[1] == HTTPStatus.OK):
 				Manager.start_task(result[2])
 
 

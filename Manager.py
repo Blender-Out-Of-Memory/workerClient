@@ -1,7 +1,8 @@
+import os
 from enum import Enum
 from threading import Thread
 from queue import Queue
-from http.client import HTTPResponse
+from http.client import HTTPResponse, HTTPConnection
 from http import HTTPMethod
 from typing import Sequence
 
@@ -38,7 +39,7 @@ class Manager:
 	def send_frame(frame: int):
 		headers = Manager.currentTask.get_identifying_header(Manager.WorkerID)
 		headers["Frame"] = str(frame)
-		message = Message.Message(HTTPMethod.POST, "/worker_manager/post-render-result/",
+		message = Message.Message(HTTPMethod.GET, "/worker_manager/post-render-result/",
 								  headers, retries=-1, bodyFilepath=Manager.currentTask.get_render_result_path(frame))
 
 		Sender.add_message(message, False)
@@ -47,12 +48,16 @@ class Manager:
 		Manager.currentTask = None
 		task = Manager.taskQueue.get()  # blocks until element in queue
 		Manager.currentTask = task
+		return task
 
 	@staticmethod
 	def registered(response: HTTPResponse, args: Sequence):
 		Manager.Status = Status.Available
-		workerID = response.headers["Worker-Id"]
-		print(f"Registered successfully with WorkerID {workerID}")
+
+		# More error handling
+		Manager.WorkerID = response.headers["Worker-Id"]
+
+		print(f"Registered successfully with WorkerID {Manager.WorkerID}")
 		Manager.registering = False
 		if (Manager.Status == Status.Quitting):
 			Manager.Status = Status.Working
@@ -82,6 +87,7 @@ class Manager:
 	def download_file(response: HTTPResponse, args: Sequence):
 		task: Task = args[0]
 		try:
+			os.makedirs(task.get_folder(), exist_ok=True)
 			with open(task.get_blender_data_path(), "wb") as file:
 				file.write(response.read())
 			Manager.taskQueue.put(task)

@@ -45,7 +45,23 @@ class RenderOutputType(Enum):
                         RenderOutputType.MP4, RenderOutputType.AVI, RenderOutputType.QKT, RenderOutputType.DV,
                         RenderOutputType.FLV, RenderOutputType.MKV, RenderOutputType.OGG, RenderOutputType.WBM)
 
+    @classmethod
+    def from_identifier(cls, identifier: str):
+        for element in RenderOutputType:
+            if (element.value[0] == identifier):
+                return element
+
+        raise ValueError(f"{identifier} is no valid RenderOutputType")
+
 class BlenderDataType(Enum):
     SingleFile = ("SINGL", "SingleFile")
     MultiFile = ("MULTI", "MultiFile")
+
+    @classmethod
+    def from_identifier(cls, identifier: str):
+        for element in BlenderDataType:
+            if (element.value[0] == identifier):
+                return element
+
+        raise ValueError(f"{identifier} is no valid BlenderDataType")
 

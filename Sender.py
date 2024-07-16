@@ -27,17 +27,18 @@ class Sender:
 				response = connection.getresponse()
 
 				print("Got response: " + str(response.status))
-				print(response.read(100))
-				connection.close()
+				# print(response.read(100).decode("utf-8", errors="replace"))
 
 				if response.status == 200:
 					success = True
 					if (message.OnSuccess):
 						try:
-							Thread(target=message.OnSuccess, args=(response, message.OnSuccessArgs)).start()
+							message.OnSuccess(response, message.OnSuccessArgs)
 						except:
 							print(f"onSuccess for message {message.URL} caused an exception")
+					connection.close()
 				else:
+					connection.close()  # close as early as possible
 					time.sleep(0.5)
 				# TODO: handle other statuses
 
