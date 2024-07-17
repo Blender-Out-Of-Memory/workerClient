@@ -77,16 +77,16 @@ class Worker:
 		writtenAnything = False
 		blenderRunning = True
 		while (blenderRunning):
-			errorLine = blenderProcess.stderr.readline()
-			if errorLine:
-				print(errorLine)
+			#errorLine = blenderProcess.stderr.readline()
+			#if errorLine:
+				#print(errorLine)
 
 			line = blenderProcess.stdout.readline()
 			lines.append(line)
 			if not line and blenderProcess.poll() is not None:  # read return code (has blender quit successfully)
 				blenderRunning = False
 			else:
-				# print(line) # outsource to new terminal window to keep this one clean
+				# print(line)  # outsource to new terminal window to keep this one clean
 				frame = Worker.evaluate_blender_cl_output(line.decode("utf-8"))
 				if (frame is not None):
 					writtenAnything = True
@@ -99,7 +99,7 @@ class Worker:
 			time.sleep(0.1)
 
 		if (task.OutputType.is_video()):
-			Worker.sendFrameCallback(-1)
+			Worker.sendFrameCallback(task.EndFrame)
 		print("Finished Blender --------------------------------------------------------")
 		if not writtenAnything:
 			for line in lines:  # Probably error messages

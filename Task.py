@@ -35,7 +35,7 @@ class Task:
 
 	def get_render_result_path(self, frame: int):
 		filepath = f"{self.get_folder()}/"
-		if (frame == -1):  # video
+		if (self.OutputType.is_video()):
 			# filepath += ####-####
 			filepath += f"{str(self.StartFrame).zfill(len(str(self.EndFrame)))}-{str(self.EndFrame).zfill(len(str(self.EndFrame)))}"
 

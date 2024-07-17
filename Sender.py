@@ -38,6 +38,7 @@ class Sender:
 							print(f"onSuccess for message {message.URL} caused an exception")
 					connection.close()
 				else:
+					print(response.read(100))
 					connection.close()  # close as early as possible
 					time.sleep(0.5)
 				# TODO: handle other statuses
