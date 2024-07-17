@@ -53,7 +53,6 @@ class Manager:
 	@staticmethod
 	def registered(response: HTTPResponse, args: Sequence):
 		Manager.Status = Status.Available
-
 		# More error handling
 		Manager.WorkerID = response.headers["Worker-Id"]
 

@@ -7,8 +7,8 @@ from Enums import RenderOutputType, BlenderDataType
 
 
 def _is_valid_id(id: str, prefix: str) -> bool:
-	pattern = prefix + r"[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}"
-	return re.fullmatch(pattern, id) is not None
+	pattern = r"[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}"
+	return re.fullmatch(pattern, id.removeprefix(prefix)) is not None
 
 
 class Task:
