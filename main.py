@@ -7,7 +7,7 @@ from Manager import Manager
 import Message
 
 # Default values for command line arguments
-HOST = "localhost"
+HOST = "0.0.0.0"
 PORT = 8001
 
 SERVER_HOST = "localhost"
